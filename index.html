@@ -206,7 +206,7 @@
 
     const viewer = pannellum.viewer('panorama', {
       type: 'equirectangular',
-      panorama: 'panorama.jpg',
+      panorama: 'panoramalr.jpg',
       autoLoad: true,
       showControls: true,
       showFullscreenCtrl: true,
@@ -221,7 +221,7 @@
       maxHfov: 115,
       autoRotate: -1,
       autoRotateInactivityDelay: 4500,
-      preview: 'panorama.jpg',
+      preview: 'panoramalr.jpg',
       strings: {
         loadButtonLabel: 'Load 360 view',
         loadingLabel: 'Loading 360 panorama…'
@@ -235,7 +235,7 @@
     });
 
     viewer.on('error', () => {
-      loadingMessage.textContent = 'The 360 image could not be loaded. Check that panorama.jpg is in the same folder as this page.';
+      loadingMessage.textContent = 'The 360 image could not be loaded. Check that panoramalr.jpg is in the same folder as this page.';
       loadingMessage.classList.remove('is-hidden');
     });
 
