@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Drone 360 Viewer</title>
+
+  <!-- 360 panorama viewer library -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.css" />
+  <script src="https://cdn.jsdelivr.net/npm/pannellum@2.5.6/build/pannellum.js"></script>
+
+  <style>
+    :root {
+      --panel-bg: rgba(8, 13, 20, 0.58);
+      --panel-border: rgba(255, 255, 255, 0.18);
+      --panel-text: rgba(255, 255, 255, 0.92);
+      --panel-muted: rgba(255, 255, 255, 0.68);
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      overflow: hidden;
+      background: #05070a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    #panorama {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      background: #05070a;
+      cursor: grab;
+    }
+
+    #panorama *,
+    .pnlm-container,
+    .pnlm-render-container,
+    .pnlm-render-container canvas {
+      cursor: grab !important;
+    }
+
+    #panorama.is-dragging *,
+    #panorama.is-dragging,
+    #panorama.is-dragging .pnlm-render-container canvas {
+      cursor: grabbing !important;
+    }
+
+    #panorama.is-zooming-in *,
+    #panorama.is-zooming-in,
+    #panorama.is-zooming-in .pnlm-render-container canvas {
+      cursor: zoom-in !important;
+    }
+
+    #panorama.is-zooming-out *,
+    #panorama.is-zooming-out,
+    #panorama.is-zooming-out .pnlm-render-container canvas {
+      cursor: zoom-out !important;
+    }
+
+    .viewer-title {
+      position: fixed;
+      left: max(18px, env(safe-area-inset-left));
+      top: max(18px, env(safe-area-inset-top));
+      z-index: 10;
+      max-width: min(390px, calc(100vw - 36px));
+      padding: 12px 14px;
+      color: var(--panel-text);
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: 0 18px 46px rgba(0, 0, 0, 0.24);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      transition: opacity 400ms ease, transform 400ms ease;
+    }
+
+    .viewer-title h1 {
+      margin: 0;
+      font-size: 15px;
+      line-height: 1.2;
+      font-weight: 650;
+      letter-spacing: 0.01em;
+    }
+
+    .viewer-title p {
+      margin: 6px 0 0;
+      font-size: 12px;
+      line-height: 1.4;
+      color: var(--panel-muted);
+    }
+
+    .viewer-title.is-hidden {
+      opacity: 0;
+      transform: translateY(-6px);
+      pointer-events: none;
+    }
+
+    .actions {
+      position: fixed;
+      right: max(18px, env(safe-area-inset-right));
+      top: max(18px, env(safe-area-inset-top));
+      z-index: 11;
+      display: flex;
+      gap: 8px;
+    }
+
+    .action-button {
+      appearance: none;
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      background: var(--panel-bg);
+      color: var(--panel-text);
+      padding: 10px 13px;
+      font: inherit;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer !important;
+      box-shadow: 0 14px 36px rgba(0, 0, 0, 0.22);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+    }
+
+    .action-button:hover,
+    .action-button:focus-visible {
+      background: rgba(255, 255, 255, 0.18);
+      outline: none;
+    }
+
+    .loading-message {
+      position: fixed;
+      inset: 0;
+      z-index: 4;
+      display: grid;
+      place-items: center;
+      color: rgba(255, 255, 255, 0.78);
+      font-size: 14px;
+      letter-spacing: 0.01em;
+      background: radial-gradient(circle at center, rgba(35, 50, 70, 0.72), rgba(5, 7, 10, 1));
+      transition: opacity 420ms ease;
+      pointer-events: none;
+    }
+
+    .loading-message.is-hidden {
+      opacity: 0;
+    }
+
+    .pnlm-controls-container {
+      top: auto !important;
+      bottom: max(18px, env(safe-area-inset-bottom)) !important;
+      left: max(18px, env(safe-area-inset-left)) !important;
+    }
+
+    .pnlm-load-box,
+    .pnlm-info-box {
+      border-radius: 14px !important;
+    }
+
+    @media (max-width: 700px) {
+      .viewer-title {
+        left: 12px;
+        top: 12px;
+        right: 12px;
+        max-width: none;
+      }
+
+      .actions {
+        right: 12px;
+        top: auto;
+        bottom: 14px;
+      }
+
+      .pnlm-controls-container {
+        bottom: 14px !important;
+        left: 12px !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main id="panorama" aria-label="Interactive 360 degree drone panorama"></main>
+
+  <div class="loading-message" id="loadingMessage">Loading 360 panorama…</div>
+
+  <section class="viewer-title" id="viewerTitle" aria-label="Viewer instructions">
+    <h1>Drone 360 View</h1>
+    <p>Click and drag to pan. Scroll or pinch to zoom. Use the controls to zoom or enter full screen.</p>
+  </section>
+
+  <div class="actions" aria-label="Viewer controls">
+    <button class="action-button" id="resetView" type="button">Reset view</button>
+  </div>
+
+  <script>
+    const panorama = document.getElementById('panorama');
+    const loadingMessage = document.getElementById('loadingMessage');
+    const viewerTitle = document.getElementById('viewerTitle');
+    const resetView = document.getElementById('resetView');
+
+    const START_YAW = 0;
+    const START_PITCH = 0;
+    const START_HFOV = 80;
+
+    const viewer = pannellum.viewer('panorama', {
+      type: 'equirectangular',
+      panorama: 'panorama.jpg',
+      autoLoad: true,
+      showControls: true,
+      showFullscreenCtrl: true,
+      keyboardZoom: true,
+      mouseZoom: true,
+      draggable: true,
+      compass: false,
+      yaw: START_YAW,
+      pitch: START_PITCH,
+      hfov: START_HFOV,
+      minHfov: 18,
+      maxHfov: 115,
+      autoRotate: -1,
+      autoRotateInactivityDelay: 4500,
+      preview: 'panorama.jpg',
+      strings: {
+        loadButtonLabel: 'Load 360 view',
+        loadingLabel: 'Loading 360 panorama…'
+      }
+    });
+
+    viewer.on('load', () => {
+      loadingMessage.classList.add('is-hidden');
+      window.setTimeout(() => loadingMessage.remove(), 500);
+      window.setTimeout(() => viewerTitle.classList.add('is-hidden'), 5500);
+    });
+
+    viewer.on('error', () => {
+      loadingMessage.textContent = 'The 360 image could not be loaded. Check that panorama.jpg is in the same folder as this page.';
+      loadingMessage.classList.remove('is-hidden');
+    });
+
+    resetView.addEventListener('click', () => {
+      viewer.stopAutoRotate();
+      viewer.setYaw(START_YAW, 900);
+      viewer.setPitch(START_PITCH, 900);
+      viewer.setHfov(START_HFOV, 900);
+    });
+
+    let zoomTimer;
+
+    panorama.addEventListener('pointerdown', () => {
+      panorama.classList.remove('is-zooming-in', 'is-zooming-out');
+      panorama.classList.add('is-dragging');
+      viewer.stopAutoRotate();
+    });
+
+    window.addEventListener('pointerup', () => {
+      panorama.classList.remove('is-dragging');
+    });
+
+    window.addEventListener('blur', () => {
+      panorama.classList.remove('is-dragging', 'is-zooming-in', 'is-zooming-out');
+    });
+
+    panorama.addEventListener('wheel', (event) => {
+      panorama.classList.remove('is-dragging', 'is-zooming-in', 'is-zooming-out');
+      panorama.classList.add(event.deltaY < 0 ? 'is-zooming-in' : 'is-zooming-out');
+      viewer.stopAutoRotate();
+      clearTimeout(zoomTimer);
+      zoomTimer = setTimeout(() => {
+        panorama.classList.remove('is-zooming-in', 'is-zooming-out');
+      }, 260);
+    }, { passive: true });
+
+    panorama.addEventListener('mouseenter', () => {
+      panorama.classList.remove('is-zooming-in', 'is-zooming-out');
+    });
+
+    panorama.addEventListener('mouseleave', () => {
+      panorama.classList.remove('is-dragging', 'is-zooming-in', 'is-zooming-out');
+    });
+  </script>
+</body>
+</html>
